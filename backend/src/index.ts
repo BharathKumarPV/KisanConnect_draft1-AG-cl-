@@ -25,12 +25,21 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SYNC_INTERVAL_HOURS = parseInt(process.env.SYNC_INTERVAL_HOURS || '6');
 
-// CORS — configurable via env
-const corsOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
-
-app.use(cors({ origin: corsOrigins, credentials: true }));
+// CORS — allows Vercel production deployments, localhost, and custom origins
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      origin.includes('localhost') ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('kisanconnect')
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Fallback: allow all for hackathon demo
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -121,4 +130,10 @@ async function main() {
   }
 }
 
-main();
+// In Vercel serverless functions, do not start HTTP listener
+if (!process.env.VERCEL) {
+  main();
+}
+
+export default app;
+export { app };
