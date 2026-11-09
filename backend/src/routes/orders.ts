@@ -246,7 +246,7 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
   });
 
   // If farmer accepts and there's a delivery address, create a pending delivery
-  if (status === 'ACCEPTED' && order.deliveryAddress && order.transportCost > 0) {
+  if (status === 'ACCEPTED' && order.deliveryAddress) {
     const existingDelivery = await prisma.delivery.findUnique({ where: { orderId: order.id } });
     if (!existingDelivery) {
       // Get farmer location from product
@@ -255,31 +255,39 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
         include: { product: true },
       });
 
-      // Find an available transport provider (or create pending for any to accept)
-      const availableTransport = await prisma.transportProfile.findFirst({
-        where: { isAvailable: true, isVerified: false }, // For demo, match any; in prod, match by area
-        orderBy: { totalDeliveries: 'asc' },
-      });
+      let distanceKm = 15;
+      if (firstItem?.product?.latitude && firstItem?.product?.longitude && order.deliveryLat && order.deliveryLng) {
+        const R = 6371;
+        const dLat = ((order.deliveryLat - firstItem.product.latitude) * Math.PI) / 180;
+        const dLon = ((order.deliveryLng - firstItem.product.longitude) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos((firstItem.product.latitude * Math.PI) / 180) * Math.cos((order.deliveryLat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+        distanceKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.3 * 10) / 10;
+      }
 
-      if (availableTransport || true) {
-        // Create a pending delivery for transport providers to accept
-        const defaultTransport = availableTransport || await prisma.transportProfile.findFirst();
-        if (defaultTransport) {
-          await prisma.delivery.create({
-            data: {
-              orderId: order.id,
-              transportProfileId: defaultTransport.id,
-              pickupAddress: firstItem?.product?.location || 'Farmer location',
-              pickupLat: firstItem?.product?.latitude,
-              pickupLng: firstItem?.product?.longitude,
-              deliveryAddress: order.deliveryAddress,
-              deliveryLat: order.deliveryLat,
-              deliveryLng: order.deliveryLng,
-              transportCost: order.transportCost,
-              status: 'PENDING',
-            },
-          });
-        }
+      const calculatedCost = order.transportCost > 0 ? order.transportCost : Math.round(100 + distanceKm * 6);
+
+      // Find an available transport provider (or default transport profile)
+      const defaultTransport = await prisma.transportProfile.findFirst({
+        where: { isAvailable: true },
+      }) || await prisma.transportProfile.findFirst();
+
+      if (defaultTransport) {
+        await prisma.delivery.create({
+          data: {
+            orderId: order.id,
+            transportProfileId: defaultTransport.id,
+            pickupAddress: firstItem?.product?.location || 'Farmer location',
+            pickupLat: firstItem?.product?.latitude,
+            pickupLng: firstItem?.product?.longitude,
+            deliveryAddress: order.deliveryAddress,
+            deliveryLat: order.deliveryLat,
+            deliveryLng: order.deliveryLng,
+            distanceKm,
+            estimatedDuration: Math.round(distanceKm * 2.5),
+            transportCost: calculatedCost,
+            status: 'PENDING',
+          },
+        });
       }
     }
   }

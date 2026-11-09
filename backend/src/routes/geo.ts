@@ -90,7 +90,7 @@ router.get('/nearby-markets', async (req: AuthRequest, res: Response): Promise<v
     .filter(m => m.distanceKm <= radius)
     .sort((a, b) => a.distanceKm - b.distanceKm);
 
-  res.json({ data: nearby });
+  res.json({ data: nearby, markets: nearby });
 });
 
 export default router;

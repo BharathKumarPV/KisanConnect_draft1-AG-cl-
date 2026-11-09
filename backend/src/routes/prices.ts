@@ -82,9 +82,10 @@ router.get('/latest', async (req: Request, res: Response): Promise<void> => {
 
 // GET /api/prices/history - price history for a commodity+market
 router.get('/history', async (req: Request, res: Response): Promise<void> => {
-  const { commodity, market, from, to, variety } = req.query;
+  const commodityParam = req.query.commodity || req.query.commodityId;
+  const { market, from, to, variety } = req.query;
 
-  if (!commodity) {
+  if (!commodityParam) {
     res.status(400).json({ error: 'commodity parameter is required' });
     return;
   }
@@ -93,9 +94,9 @@ router.get('/history', async (req: Request, res: Response): Promise<void> => {
 
   where.commodity = {
     OR: [
-      { id: String(commodity) },
-      { name: { equals: String(commodity) } },
-      { normalizedName: String(commodity).toLowerCase().replace(/\s+/g, '_') },
+      { id: String(commodityParam) },
+      { name: { equals: String(commodityParam) } },
+      { normalizedName: String(commodityParam).toLowerCase().replace(/\s+/g, '_') },
     ],
   };
 

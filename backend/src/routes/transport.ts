@@ -52,6 +52,20 @@ router.patch('/profile', authenticate, requireTransport, async (req: AuthRequest
   res.json({ profile });
 });
 
+// GET /api/transport/vehicles
+router.get('/vehicles', authenticate, requireTransport, async (req: AuthRequest, res: Response): Promise<void> => {
+  const profile = await prisma.transportProfile.findUnique({ where: { userId: req.user!.id } });
+  if (!profile) {
+    res.status(404).json({ error: 'Transport profile not found' });
+    return;
+  }
+  const vehicles = await prisma.vehicle.findMany({
+    where: { transportProfileId: profile.id },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ vehicles });
+});
+
 // POST /api/transport/vehicles
 router.post('/vehicles', authenticate, requireTransport, async (req: AuthRequest, res: Response): Promise<void> => {
   const parsed = VehicleSchema.safeParse(req.body);
@@ -92,8 +106,8 @@ router.patch('/vehicles/:id', authenticate, requireTransport, async (req: AuthRe
   res.json({ vehicle: updated });
 });
 
-// GET /api/transport/deliveries
-router.get('/deliveries', authenticate, requireTransport, async (req: AuthRequest, res: Response): Promise<void> => {
+// GET /api/transport/deliveries and /api/transport/deliveries/mine
+const handleGetDeliveries = async (req: AuthRequest, res: Response): Promise<void> => {
   const { status, page = '1', limit = '20' } = req.query;
   const pageNum = Math.max(1, parseInt(String(page)));
   const limitNum = Math.min(50, Math.max(1, parseInt(String(limit))));
@@ -123,7 +137,10 @@ router.get('/deliveries', authenticate, requireTransport, async (req: AuthReques
   ]);
 
   res.json({ data: deliveries, pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) } });
-});
+};
+
+router.get('/deliveries', authenticate, requireTransport, handleGetDeliveries);
+router.get('/deliveries/mine', authenticate, requireTransport, handleGetDeliveries);
 
 // GET /api/transport/deliveries/available
 router.get('/deliveries/available', authenticate, requireTransport, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -148,8 +165,8 @@ router.get('/deliveries/available', authenticate, requireTransport, async (req: 
   res.json({ data: deliveries });
 });
 
-// PATCH /api/transport/deliveries/:id/accept
-router.patch('/deliveries/:id/accept', authenticate, requireTransport, async (req: AuthRequest, res: Response): Promise<void> => {
+// POST & PATCH /api/transport/deliveries/:id/accept
+const handleAcceptDelivery = async (req: AuthRequest, res: Response): Promise<void> => {
   const profile = await prisma.transportProfile.findUnique({ where: { userId: req.user!.id } });
   if (!profile) { res.status(404).json({ error: 'Transport profile not found' }); return; }
 
@@ -159,9 +176,16 @@ router.patch('/deliveries/:id/accept', authenticate, requireTransport, async (re
     return;
   }
 
+  const { vehicleId } = req.body as { vehicleId?: string };
+
   const updated = await prisma.delivery.update({
     where: { id: req.params.id },
-    data: { transportProfileId: profile.id, status: 'ACCEPTED', acceptedAt: new Date() },
+    data: {
+      transportProfileId: profile.id,
+      vehicleId: vehicleId || null,
+      status: 'ACCEPTED',
+      acceptedAt: new Date()
+    },
   });
 
   const order = await prisma.order.findUnique({ where: { id: delivery.orderId } });
@@ -175,7 +199,10 @@ router.patch('/deliveries/:id/accept', authenticate, requireTransport, async (re
   }
 
   res.json({ delivery: updated });
-});
+};
+
+router.post('/deliveries/:id/accept', authenticate, requireTransport, handleAcceptDelivery);
+router.patch('/deliveries/:id/accept', authenticate, requireTransport, handleAcceptDelivery);
 
 // PATCH /api/transport/deliveries/:id/status
 router.patch('/deliveries/:id/status', authenticate, requireTransport, async (req: AuthRequest, res: Response): Promise<void> => {
