@@ -1,0 +1,364 @@
+// KisanConnect Prisma Schema — SQLite
+// SQLite does not support native enums; role/status fields use String with app-level validation.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Role values: FARMER | BUYER | TRANSPORT | ADMIN
+// OrderStatus values: PENDING | ACCEPTED | PROCESSING | READY | COMPLETED | CANCELLED
+// DeliveryStatus values: PENDING | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
+// AlertCondition values: ABOVE | BELOW
+// SyncStatus values: RUNNING | SUCCESS | FAILED | PARTIAL
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  mobile       String?
+  passwordHash String
+  role         String   @default("FARMER")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  farmerProfile    FarmerProfile?
+  buyerProfile     BuyerProfile?
+  transportProfile TransportProfile?
+  products         Product[]
+  ordersAsBuyer    Order[]        @relation("BuyerOrders")
+  ordersAsFarmer   Order[]        @relation("FarmerOrders")
+  reviewsGiven     Review[]       @relation("ReviewsGiven")
+  reviewsReceived  Review[]       @relation("ReviewsReceived")
+  priceAlerts      PriceAlert[]
+  notifications    Notification[]
+  favorites        Favorite[]
+}
+
+model FarmerProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  village          String?
+  district         String
+  state            String
+  pincode          String?
+  farmSize         Float?
+  farmSizeUnit     String?  @default("acres")
+  preferredMarkets String?
+  bio              String?
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  crops FarmerCrop[]
+}
+
+model BuyerProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName String?
+  district    String
+  state       String
+  buyerType   String   @default("TRADER")
+  gstin       String?
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TransportProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber   String?
+  isVerified      Boolean   @default(false)
+  verifiedAt      DateTime?
+  serviceArea     String?
+  isAvailable     Boolean   @default(true)
+  rating          Float     @default(0)
+  totalDeliveries Int       @default(0)
+  district        String
+  state           String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vehicles   Vehicle[]
+  deliveries Delivery[]
+}
+
+model Vehicle {
+  id                 String           @id @default(cuid())
+  transportProfileId String
+  transportProfile   TransportProfile @relation(fields: [transportProfileId], references: [id], onDelete: Cascade)
+  type               String           @default("MINI_TRUCK")
+  registrationNumber String?
+  capacityKg         Float            @default(1000)
+  isRefrigerated     Boolean          @default(false)
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+}
+
+model Market {
+  id         String   @id @default(cuid())
+  name       String
+  state      String
+  district   String
+  address    String?
+  apmc       String?
+  eNamStatus Boolean  @default(false)
+  latitude   Float?
+  longitude  Float?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  prices MarketPrice[]
+
+  @@unique([name, district, state])
+  @@index([state])
+  @@index([district])
+}
+
+model Commodity {
+  id             String   @id @default(cuid())
+  name           String
+  normalizedName String   @unique
+  category       String
+  unit           String   @default("Quintal")
+  imageUrl       String?
+  description    String?
+  createdAt      DateTime @default(now())
+
+  varieties   CommodityVariety[]
+  prices      MarketPrice[]
+  farmerCrops FarmerCrop[]
+  products    Product[]
+  alerts      PriceAlert[]
+}
+
+model CommodityVariety {
+  id             String    @id @default(cuid())
+  commodityId    String
+  commodity      Commodity @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+
+  prices MarketPrice[]
+
+  @@unique([commodityId, normalizedName])
+}
+
+model MarketPrice {
+  id          String            @id @default(cuid())
+  marketId    String
+  market      Market            @relation(fields: [marketId], references: [id])
+  commodityId String
+  commodity   Commodity         @relation(fields: [commodityId], references: [id])
+  varietyId   String?
+  variety     CommodityVariety? @relation(fields: [varietyId], references: [id])
+  minPrice    Float
+  maxPrice    Float
+  modalPrice  Float
+  arrivals    Float?
+  unit        String            @default("Quintal")
+  priceDate   DateTime
+  source      String            @default("data.gov.in")
+  sourceUrl   String?
+  retrievedAt DateTime          @default(now())
+  rawData     String?
+
+  @@index([marketId, priceDate])
+  @@index([commodityId, priceDate])
+  @@index([priceDate])
+}
+
+model DataSource {
+  id              String    @id @default(cuid())
+  name            String    @unique
+  url             String
+  apiKey          String?
+  isActive        Boolean   @default(true)
+  lastSyncAt      DateTime?
+  recordsImported Int       @default(0)
+  errorCount      Int       @default(0)
+  status          String    @default("IDLE")
+
+  syncLogs DataSyncLog[]
+}
+
+model DataSyncLog {
+  id              String     @id @default(cuid())
+  dataSourceId    String
+  dataSource      DataSource @relation(fields: [dataSourceId], references: [id])
+  startedAt       DateTime   @default(now())
+  completedAt     DateTime?
+  status          String     @default("RUNNING")
+  recordsImported Int        @default(0)
+  errors          String?
+  duration        Int?
+}
+
+model FarmerCrop {
+  id              String        @id @default(cuid())
+  farmerProfileId String
+  farmerProfile   FarmerProfile @relation(fields: [farmerProfileId], references: [id], onDelete: Cascade)
+  commodityId     String
+  commodity       Commodity     @relation(fields: [commodityId], references: [id])
+  variety         String?
+  quantity        Float
+  unit            String        @default("Quintal")
+  harvestDate     DateTime?
+  isAvailable     Boolean       @default(true)
+  minPrice        Float?
+  location        String?
+  createdAt       DateTime      @default(now())
+}
+
+model Product {
+  id          String    @id @default(cuid())
+  farmerId    String
+  farmer      User      @relation(fields: [farmerId], references: [id])
+  commodityId String
+  commodity   Commodity @relation(fields: [commodityId], references: [id])
+  title       String
+  description String?
+  quantity    Float
+  unit        String    @default("Quintal")
+  price       Float
+  images      String?
+  location    String
+  latitude    Float?
+  longitude   Float?
+  isDemo      Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  orderItems OrderItem[]
+  favorites  Favorite[]
+}
+
+model Order {
+  id              String   @id @default(cuid())
+  buyerId         String
+  buyer           User     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  farmerId        String
+  farmer          User     @relation("FarmerOrders", fields: [farmerId], references: [id])
+  status          String   @default("PENDING")
+  deliveryAddress String?
+  deliveryLat     Float?
+  deliveryLng     Float?
+  produceAmount   Float    @default(0)
+  transportCost   Float    @default(0)
+  platformFee     Float    @default(0)
+  totalAmount     Float
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items    OrderItem[]
+  reviews  Review[]
+  delivery Delivery?
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Float
+  unit      String
+  price     Float
+}
+
+model Delivery {
+  id                 String           @id @default(cuid())
+  orderId            String           @unique
+  order              Order            @relation(fields: [orderId], references: [id])
+  transportProfileId String
+  transportProfile   TransportProfile @relation(fields: [transportProfileId], references: [id])
+  vehicleId          String?
+  pickupAddress      String
+  pickupLat          Float?
+  pickupLng          Float?
+  deliveryAddress    String
+  deliveryLat        Float?
+  deliveryLng        Float?
+  distanceKm         Float?
+  estimatedDuration  Int?
+  transportCost      Float
+  status             String           @default("PENDING")
+  acceptedAt         DateTime?
+  pickedUpAt         DateTime?
+  deliveredAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([transportProfileId])
+  @@index([status])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id])
+  reviewerId String
+  reviewer   User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  revieweeId String
+  reviewee   User     @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([orderId, reviewerId])
+}
+
+model PriceAlert {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commodityId   String
+  commodity     Commodity @relation(fields: [commodityId], references: [id])
+  marketId      String?
+  targetPrice   Float
+  condition     String    @default("ABOVE")
+  isActive      Boolean   @default(true)
+  lastTriggered DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  data      String?
+  createdAt DateTime @default(now())
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
