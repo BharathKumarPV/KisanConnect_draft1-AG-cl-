@@ -19,7 +19,7 @@ const ProductSchema = z.object({
 
 // GET /api/marketplace/products
 router.get('/products', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { commodity, state, search, page = '1', limit = '20', farmerOnly } = req.query;
+  const { commodity, category, state, search, page = '1', limit = '20', farmerOnly } = req.query;
 
   const pageNum = Math.max(1, parseInt(String(page)));
   const limitNum = Math.min(100, Math.max(1, parseInt(String(limit))));
@@ -27,11 +27,20 @@ router.get('/products', async (req: AuthRequest, res: Response): Promise<void> =
 
   const where: Record<string, unknown> = { isActive: true };
 
-  if (commodity) {
+  const catParam = category ? String(category).trim().toUpperCase() : null;
+  const commParam = commodity ? String(commodity).trim() : null;
+  const KNOWN_CATEGORIES = ['VEGETABLE', 'FRUIT', 'GRAIN', 'PULSE', 'SPICE', 'OILSEED', 'OTHER'];
+
+  // Category matching
+  if (catParam && KNOWN_CATEGORIES.includes(catParam)) {
+    where.commodity = { category: { equals: catParam } };
+  } else if (commParam && KNOWN_CATEGORIES.includes(commParam.toUpperCase())) {
+    where.commodity = { category: { equals: commParam.toUpperCase() } };
+  } else if (commParam) {
     where.commodity = {
       OR: [
-        { name: { contains: String(commodity) } },
-        { normalizedName: { contains: String(commodity).toLowerCase().replace(/\s+/g, '_') } },
+        { name: { contains: commParam } },
+        { normalizedName: { contains: commParam.toLowerCase().replace(/\s+/g, '_') } },
       ],
     };
   }
@@ -41,10 +50,11 @@ router.get('/products', async (req: AuthRequest, res: Response): Promise<void> =
   }
 
   if (search) {
+    const s = String(search).trim();
     where.OR = [
-      { title: { contains: String(search) } },
-      { description: { contains: String(search) } },
-      { location: { contains: String(search) } },
+      { title: { contains: s } },
+      { description: { contains: s } },
+      { location: { contains: s } },
     ];
   }
 

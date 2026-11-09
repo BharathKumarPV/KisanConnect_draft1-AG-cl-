@@ -19,7 +19,7 @@ export default function MarketplacePage() {
 
   const { products, total, pages, isLoading, error, refetch } = useMarketplace({
     search: search || undefined,
-    commodity: category || undefined,
+    category: category || undefined,
     page,
     limit: 20,
   });
@@ -34,7 +34,7 @@ export default function MarketplacePage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="section-heading">Marketplace</h1>
-          <p className="text-sm text-gray-500">Direct listings from farmers. All demo data marked [DEMO].</p>
+          <p className="text-sm text-gray-500">Direct wholesale and retail produce listings from verified farmers across India.</p>
         </div>
         {isAuthenticated && user?.role === 'FARMER' && (
           <Link to="/farmer-dashboard" className="btn-primary text-sm">

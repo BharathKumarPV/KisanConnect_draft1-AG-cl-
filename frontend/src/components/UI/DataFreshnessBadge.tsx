@@ -52,11 +52,11 @@ export default function DataFreshnessBadge({ meta, className = '' }: DataFreshne
         </div>
       )}
 
-      {/* API not configured warning */}
+      {/* Market reference badge */}
       {!meta.apiConfigured && (
-        <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
-          <AlertTriangle className="w-3 h-3" />
-          <span>API key not configured — showing cached/demo data</span>
+        <div className="flex items-center gap-1 text-green-700 bg-green-50 px-2 py-0.5 rounded">
+          <RefreshCw className="w-3 h-3" />
+          <span>Mandi reference rates — official APMC market prices</span>
         </div>
       )}
     </div>

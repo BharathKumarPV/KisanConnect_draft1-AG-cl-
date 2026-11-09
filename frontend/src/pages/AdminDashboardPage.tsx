@@ -152,7 +152,7 @@ export default function AdminDashboardPage() {
             {users.map((u) => (
               <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{u.name.replace(' [DEMO]', '')}</p>
+                  <p className="text-sm font-medium text-gray-900">{u.name}</p>
                   <p className="text-xs text-gray-500">{u.email}</p>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -176,7 +176,7 @@ export default function AdminDashboardPage() {
           <li>Set <code className="bg-blue-100 px-1 rounded">DATA_GOV_API_KEY</code> in <code className="bg-blue-100 px-1 rounded">backend/.env</code></li>
           <li>Click "Trigger Sync Now" to fetch live AGMARKNET data</li>
           <li>Sync runs automatically every {import.meta.env.VITE_SYNC_INTERVAL ?? 6} hours when configured</li>
-          <li>Demo credentials: admin@kisanconnect.in / farmer@demo.in / buyer@demo.in (all password123 prefix)</li>
+          <li>Quick sign-in credentials: admin@kisanconnect.in / farmer@demo.in / buyer@demo.in</li>
         </ol>
       </div>
     </div>

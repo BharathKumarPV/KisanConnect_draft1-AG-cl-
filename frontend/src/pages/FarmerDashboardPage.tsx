@@ -88,7 +88,7 @@ export default function FarmerDashboardPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="section-heading">Farmer Dashboard</h1>
-          <p className="text-sm text-gray-500">Welcome, {user?.name.replace(' [DEMO]', '')} 🌾</p>
+          <p className="text-sm text-gray-500">Welcome, {user?.name} 🌾</p>
         </div>
         <button onClick={() => setShowProductForm(!showProductForm)} className="btn-primary">
           <Plus className="w-4 h-4" />
@@ -140,7 +140,6 @@ export default function FarmerDashboardPage() {
                     <p className="text-xs text-gray-500">{p.quantity} {p.unit} · ₹{p.price.toLocaleString('en-IN')}/{p.unit}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {p.isDemo && <span className="badge badge-demo text-xs">DEMO</span>}
                     <span className={`badge ${p.isActive ? 'badge-green' : 'badge-gray'}`}>
                       {p.isActive ? 'Active' : 'Inactive'}
                     </span>
@@ -165,7 +164,7 @@ export default function FarmerDashboardPage() {
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <p className="text-sm font-semibold text-gray-900">#{o.id.slice(-8)}</p>
-                      <p className="text-xs text-gray-500">from {o.buyer?.name?.replace(' [DEMO]', '')}</p>
+                      <p className="text-xs text-gray-500">from {o.buyer?.name}</p>
                     </div>
                     <span className={`badge text-xs ${ORDER_BADGE[o.status] || 'badge-gray'}`}>{o.status}</span>
                   </div>

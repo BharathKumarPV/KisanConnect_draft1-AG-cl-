@@ -4,6 +4,7 @@ import type { Product } from '../types';
 
 interface UseMarketplaceOptions {
   commodity?: string;
+  category?: string;
   state?: string;
   search?: string;
   page?: number;
@@ -19,13 +20,14 @@ export function useMarketplace(options: UseMarketplaceOptions = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { commodity, state, search, page = 1, limit = 20, farmerOnly = false, autoFetch = true } = options;
+  const { commodity, category, state, search, page = 1, limit = 20, farmerOnly = false, autoFetch = true } = options;
 
   const fetch = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const params: Record<string, string | number | boolean> = { page, limit };
+      if (category) params.category = category;
       if (commodity) params.commodity = commodity;
       if (state) params.state = state;
       if (search) params.search = search;

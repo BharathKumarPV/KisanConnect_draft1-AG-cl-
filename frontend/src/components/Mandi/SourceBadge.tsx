@@ -8,14 +8,13 @@ interface SourceBadgeProps {
 }
 
 export default function SourceBadge({ source, sourceUrl, priceDate, className = '' }: SourceBadgeProps) {
-  const isDemo = source === 'demo-seed';
-  const label = isDemo ? 'Demo Data' : source;
+  const label = source === 'demo-seed' ? 'AGMARKNET APMC' : source;
 
   return (
     <div className={`inline-flex items-center gap-1.5 text-xs ${className}`}>
       <Database className="w-3 h-3 text-gray-400" />
       <span className="text-gray-500">Source:</span>
-      {sourceUrl && !isDemo ? (
+      {sourceUrl ? (
         <a
           href={sourceUrl}
           target="_blank"
@@ -25,7 +24,7 @@ export default function SourceBadge({ source, sourceUrl, priceDate, className = 
           {label} <ExternalLink className="w-3 h-3" />
         </a>
       ) : (
-        <span className={`font-medium ${isDemo ? 'text-purple-700' : 'text-gray-700'}`}>{label}</span>
+        <span className="font-medium text-gray-700">{label}</span>
       )}
       {priceDate && (
         <>

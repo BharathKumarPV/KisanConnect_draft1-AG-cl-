@@ -130,104 +130,130 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
 
   const { items, notes, deliveryAddress, deliveryLat, deliveryLng, transportCost } = parsed.data;
 
-  const products = await prisma.product.findMany({
-    where: { id: { in: items.map(i => i.productId) }, isActive: true },
-  });
-
-  if (products.length !== items.length) {
-    res.status(400).json({ error: 'One or more products not found or inactive' });
-    return;
-  }
-
-  // Validate stock availability for all commodities
-  for (const item of items) {
-    const product = products.find(p => p.id === item.productId)!;
-    if (item.quantity > product.quantity) {
-      res.status(400).json({
-        error: `Requested quantity (${item.quantity} ${product.unit}) exceeds available stock (${product.quantity} ${product.unit}) for "${product.title}"`
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const products = await tx.product.findMany({
+        where: { id: { in: items.map(i => i.productId) }, isActive: true },
       });
-      return;
-    }
-  }
 
-  const farmerIds = [...new Set(products.map(p => p.farmerId))];
-  if (farmerIds.length > 1) {
-    res.status(400).json({ error: 'All items must be from the same farmer' });
-    return;
-  }
+      if (products.length !== items.length) {
+        throw new Error('ERR_NOT_FOUND:One or more products not found or inactive');
+      }
 
-  const farmerId = farmerIds[0];
-  let produceAmount = 0;
+      // Concurrency control: Atomic conditional inventory decrement
+      for (const item of items) {
+        const product = products.find(p => p.id === item.productId)!;
+        if (item.quantity > product.quantity) {
+          throw new Error(
+            `ERR_INSUFFICIENT_STOCK:Requested quantity (${item.quantity} ${product.unit}) exceeds available stock (${product.quantity} ${product.unit}) for "${product.title}"`
+          );
+        }
 
-  const orderItems = items.map(item => {
-    const product = products.find(p => p.id === item.productId)!;
-    const lineTotal = product.price * item.quantity;
-    produceAmount += lineTotal;
-    return {
-      productId: item.productId,
-      quantity: item.quantity,
-      unit: item.unit || product.unit,
-      price: product.price,
-    };
-  });
+        // Atomic conditional update ensures no other concurrent request has depleted stock in the interim
+        const updateResult = await tx.product.updateMany({
+          where: {
+            id: item.productId,
+            quantity: { gte: item.quantity },
+          },
+          data: {
+            quantity: { decrement: item.quantity },
+          },
+        });
 
-  const platformFee = Math.round(produceAmount * PLATFORM_FEE_PERCENT / 100);
-  const totalAmount = produceAmount + transportCost + platformFee;
+        if (updateResult.count === 0) {
+          throw new Error(
+            `ERR_CONCURRENCY_CONFLICT:Stock for "${product.title}" was just claimed or changed by another concurrent order. Please refresh to view current stock.`
+          );
+        }
+      }
 
-  const order = await prisma.order.create({
-    data: {
-      buyerId: req.user!.id,
-      farmerId,
-      produceAmount,
-      transportCost,
-      platformFee,
-      totalAmount,
-      notes,
-      deliveryAddress,
-      deliveryLat,
-      deliveryLng,
-      items: { create: orderItems },
-    },
-    include: {
-      items: true,
-      buyer: { select: { id: true, name: true } },
-      farmer: { select: { id: true, name: true } },
-    },
-  });
+      const farmerIds = [...new Set(products.map(p => p.farmerId))];
+      if (farmerIds.length > 1) {
+        throw new Error('ERR_MULTI_FARMER:All items must be from the same farmer');
+      }
 
-  // Automatically decrement product stock for all ordered commodities
-  for (const item of items) {
-    const product = products.find(p => p.id === item.productId)!;
-    const newQty = Math.max(0, product.quantity - item.quantity);
-    await prisma.product.update({
-      where: { id: item.productId },
-      data: {
-        quantity: newQty,
+      const farmerId = farmerIds[0];
+      let produceAmount = 0;
+
+      const orderItems = items.map(item => {
+        const product = products.find(p => p.id === item.productId)!;
+        const lineTotal = product.price * item.quantity;
+        produceAmount += lineTotal;
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+          unit: item.unit || product.unit,
+          price: product.price,
+        };
+      });
+
+      const platformFee = Math.round(produceAmount * PLATFORM_FEE_PERCENT / 100);
+      const totalAmount = produceAmount + transportCost + platformFee;
+
+      const order = await tx.order.create({
+        data: {
+          buyerId: req.user!.id,
+          farmerId,
+          produceAmount,
+          transportCost,
+          platformFee,
+          totalAmount,
+          notes,
+          deliveryAddress,
+          deliveryLat,
+          deliveryLng,
+          items: { create: orderItems },
+        },
+        include: {
+          items: true,
+          buyer: { select: { id: true, name: true } },
+          farmer: { select: { id: true, name: true } },
+        },
+      });
+
+      // Notify farmer
+      await tx.notification.create({
+        data: {
+          userId: farmerId,
+          type: 'ORDER_UPDATE',
+          title: 'New Order Received',
+          message: `New order from ${order.buyer.name} for ₹${totalAmount.toLocaleString('en-IN')}.`,
+          data: JSON.stringify({ orderId: order.id }),
+        },
+      });
+
+      return {
+        order,
+        produceAmount,
+        transportCost,
+        platformFee,
+        totalAmount,
+      };
+    });
+
+    res.status(201).json({
+      order: result.order,
+      priceBreakdown: {
+        produceAmount: result.produceAmount,
+        transportCost: result.transportCost,
+        platformFee: result.platformFee,
+        totalAmount: result.totalAmount,
+        farmerReceives: result.produceAmount,
       },
     });
+  } catch (err: any) {
+    const msg = String(err.message || '');
+    if (msg.startsWith('ERR_INSUFFICIENT_STOCK:')) {
+      res.status(400).json({ error: msg.replace('ERR_INSUFFICIENT_STOCK:', '') });
+    } else if (msg.startsWith('ERR_CONCURRENCY_CONFLICT:')) {
+      res.status(409).json({ error: msg.replace('ERR_CONCURRENCY_CONFLICT:', '') });
+    } else if (msg.startsWith('ERR_NOT_FOUND:') || msg.startsWith('ERR_MULTI_FARMER:')) {
+      res.status(400).json({ error: msg.split(':')[1] });
+    } else {
+      console.error('[Order Placement Error]', err);
+      res.status(500).json({ error: 'Failed to process order. Please try again.' });
+    }
   }
-
-  // Notify farmer
-  await prisma.notification.create({
-    data: {
-      userId: farmerId,
-      type: 'ORDER_UPDATE',
-      title: 'New Order Received',
-      message: `New order from ${order.buyer.name} for ₹${totalAmount.toLocaleString('en-IN')}.`,
-      data: JSON.stringify({ orderId: order.id }),
-    },
-  });
-
-  res.status(201).json({
-    order,
-    priceBreakdown: {
-      produceAmount,
-      transportCost,
-      platformFee,
-      totalAmount,
-      farmerReceives: produceAmount,
-    },
-  });
 });
 
 // PATCH /api/orders/:id/status

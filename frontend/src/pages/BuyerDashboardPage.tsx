@@ -111,7 +111,7 @@ export default function BuyerDashboardPage() {
     <div className="page-container">
       <div className="mb-6">
         <h1 className="section-heading">Buyer Dashboard</h1>
-        <p className="text-sm text-gray-500">Welcome, {user?.name.replace(' [DEMO]', '')} 🛒</p>
+        <p className="text-sm text-gray-500">Welcome, {user?.name} 🛒</p>
       </div>
 
       {/* Stats */}
@@ -161,7 +161,7 @@ export default function BuyerDashboardPage() {
                         <div>
                           <p className="text-sm font-medium text-gray-900">#{o.id.slice(-8)}</p>
                           <p className="text-xs text-gray-500">
-                            {o.farmer?.name?.replace(' [DEMO]', '')} · ₹{o.totalAmount.toLocaleString('en-IN')}
+                            {o.farmer?.name} · ₹{o.totalAmount.toLocaleString('en-IN')}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -234,7 +234,7 @@ export default function BuyerDashboardPage() {
                   <div>
                     <p className="text-sm font-medium">{f.product.title}</p>
                     <p className="text-xs text-gray-500">
-                      ₹{f.product.price.toLocaleString('en-IN')}/{f.product.unit} · {f.product.farmer.name.replace(' [DEMO]', '')}
+                      ₹{f.product.price.toLocaleString('en-IN')}/{f.product.unit} · {f.product.farmer?.name}
                     </p>
                   </div>
                   <Link to={`/marketplace/${f.product.id}`} className="text-xs text-green-700 hover:underline">View</Link>

@@ -124,7 +124,7 @@ export default function Navbar() {
                   <div className={`w-7 h-7 ${avatarBg()} rounded-full flex items-center justify-center`}>
                     <span className={`${avatarText()} text-xs font-bold`}>{user.name[0].toUpperCase()}</span>
                   </div>
-                  <span className="max-w-[120px] truncate">{user.name.replace(' [DEMO]', '')}</span>
+                  <span className="max-w-[120px] truncate">{user.name}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                 </button>
 

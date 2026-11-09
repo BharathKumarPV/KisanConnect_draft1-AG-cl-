@@ -38,7 +38,7 @@ export default function LoginPage() {
       await login(demoEmail, demoPassword);
       navigate(from, { replace: true });
     } catch {
-      setError('Demo login failed.');
+      setError('Sign-in failed. Please check credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +91,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs text-gray-500 text-center mb-2">Demo accounts (click to sign in)</p>
+            <p className="text-xs text-gray-500 text-center mb-2">Quick Sign-In by Role</p>
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: 'Admin', email: 'admin@kisanconnect.in', password: 'admin123' },

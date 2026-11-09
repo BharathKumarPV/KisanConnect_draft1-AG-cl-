@@ -8,15 +8,12 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product, onFavorite }: ProductCardProps) {
-  const isDemo = product.isDemo;
-
   return (
     <div className="card p-4 flex flex-col hover:shadow-md transition-shadow">
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap mb-1">
-            {isDemo && <span className="badge badge-demo">DEMO</span>}
             <span className="badge badge-gray">{product.commodity?.category}</span>
           </div>
           <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate">

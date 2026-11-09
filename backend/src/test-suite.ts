@@ -275,36 +275,76 @@ async function main() {
     }
   });
 
-  await runTest('Inventory', 'Verify Stock Decrement on Quintal Commodities (e.g. 200 Quintal -> 190 Quintal)', async () => {
-    // Find Red Onion or first quintal product
-    const listRes = await axios.get(`${API_BASE}/marketplace/products`);
-    const quintalProd = listRes.data.data.find((p: any) => p.unit === 'Quintal' && p.quantity >= 20);
-    if (quintalProd) {
-      const initialQty = quintalProd.quantity;
-      const orderQty = 10;
-      const orderRes = await axios.post(`${API_BASE}/orders`, {
-        items: [{ productId: quintalProd.id, quantity: orderQty, unit: quintalProd.unit }],
-        deliveryAddress: 'Bangalore Wholesale Yard',
-      }, {
-        headers: { Authorization: `Bearer ${buyerToken}` }
-      });
-      if (!orderRes.data.order?.id) throw new Error('Order creation failed for quintal product');
-
-      // Verify product detail now reflects initialQty - 10
-      const updatedProdRes = await axios.get(`${API_BASE}/marketplace/products/${quintalProd.id}`);
-      const expectedQty = initialQty - orderQty;
-      if (updatedProdRes.data.product.quantity !== expectedQty) {
-        throw new Error(`Expected ${expectedQty} Quintal, got ${updatedProdRes.data.product.quantity}`);
+  await runTest('Marketplace', 'Verify Catalog Coverage for ALL 7 Categories (VEGETABLE, FRUIT, GRAIN, PULSE, SPICE, OILSEED, OTHER)', async () => {
+    const categories = ['VEGETABLE', 'FRUIT', 'GRAIN', 'PULSE', 'SPICE', 'OILSEED', 'OTHER'];
+    for (const cat of categories) {
+      const res = await axios.get(`${API_BASE}/marketplace/products?category=${cat}`);
+      if (!res.data.data || res.data.data.length === 0) {
+        throw new Error(`Category ${cat} has 0 listings! Expected active products.`);
       }
-
-      // Verify marketplace list also reflects initialQty - 10
-      const updatedListRes = await axios.get(`${API_BASE}/marketplace/products`);
-      const updatedFound = updatedListRes.data.data.find((p: any) => p.id === quintalProd.id);
-      if (updatedFound.quantity !== expectedQty) {
-        throw new Error(`Marketplace list expected ${expectedQty}, got ${updatedFound.quantity}`);
+      for (const prod of res.data.data) {
+        if (prod.commodity?.category !== cat) {
+          throw new Error(`Filter mismatch: requested ${cat}, got ${prod.commodity?.category}`);
+        }
       }
-      console.log(`    Quintal commodity ${quintalProd.title}: stock decremented from ${initialQty} to ${expectedQty} Quintal`);
+      console.log(`    Category ${cat}: ${res.data.data.length} active listings verified`);
     }
+  });
+
+  await runTest('Concurrency', 'Optimistic Concurrency Control (OCC) - Prevent Race Conditions & Double-Selling', async () => {
+    // 1. Create a specialized product with quantity = 15
+    const prodRes = await axios.post(`${API_BASE}/marketplace/products`, {
+      commodityId: testCommodityId,
+      title: 'High-Demand Concurrency Test Lot',
+      description: 'Limited inventory test batch for concurrency evaluation',
+      quantity: 15,
+      unit: 'Quintal',
+      price: 1500,
+      location: 'Pune APMC',
+      latitude: puneLat,
+      longitude: puneLng,
+    }, {
+      headers: { Authorization: `Bearer ${farmerToken}` },
+    });
+    const occProdId = prodRes.data.product.id;
+
+    // 2. Launch two simultaneous competing orders for 10 Quintals each (Total requested: 20, Available: 15)
+    const order1Promise = axios.post(`${API_BASE}/orders`, {
+      items: [{ productId: occProdId, quantity: 10, unit: 'Quintal' }],
+      deliveryAddress: 'Buyer A Hub',
+    }, {
+      headers: { Authorization: `Bearer ${buyerToken}` },
+    });
+
+    const order2Promise = axios.post(`${API_BASE}/orders`, {
+      items: [{ productId: occProdId, quantity: 10, unit: 'Quintal' }],
+      deliveryAddress: 'Buyer B Hub',
+    }, {
+      headers: { Authorization: `Bearer ${buyerToken}` },
+    });
+
+    const [res1, res2] = await Promise.allSettled([order1Promise, order2Promise]);
+
+    const successes = [res1, res2].filter(r => r.status === 'fulfilled');
+    const failures = [res1, res2].filter(r => r.status === 'rejected');
+
+    if (successes.length !== 1 || failures.length !== 1) {
+      throw new Error(`Concurrency violation! Expected exactly 1 success and 1 failure. Got ${successes.length} successes and ${failures.length} failures.`);
+    }
+
+    const failedErr = (failures[0] as PromiseRejectedResult).reason;
+    const statusCode = failedErr.response?.status;
+    if (statusCode !== 400 && statusCode !== 409) {
+      throw new Error(`Expected HTTP 400 or 409 for concurrency conflict, got HTTP ${statusCode}`);
+    }
+
+    // 3. Verify remaining stock in DB is exactly 5 (15 - 10)
+    const checkRes = await axios.get(`${API_BASE}/marketplace/products/${occProdId}`);
+    if (checkRes.data.product.quantity !== 5) {
+      throw new Error(`Inventory drifted! Expected 5 Quintal, found ${checkRes.data.product.quantity}`);
+    }
+
+    console.log(`    Concurrency control passed: exactly 1 order placed, 1 rejected with HTTP ${statusCode}, stock accurately decremented to 5 Quintal`);
   });
 
   await runTest('Orders', 'Farmer Accepts Order (Triggers Delivery Job Creation)', async () => {

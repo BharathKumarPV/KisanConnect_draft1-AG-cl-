@@ -60,8 +60,8 @@ export default function Footer() {
           <p className="text-xs">
             © {new Date().getFullYear()} KisanConnect. Data sourced from Government of India open data portals.
           </p>
-          <p className="text-xs text-gray-600">
-            Demo credentials — Admin: admin@kisanconnect.in | Farmer: farmer@demo.in | Buyer: buyer@demo.in
+          <p className="text-xs text-gray-500">
+            Quick access — Admin: admin@kisanconnect.in | Farmer: farmer@demo.in | Buyer: buyer@demo.in
           </p>
         </div>
       </div>

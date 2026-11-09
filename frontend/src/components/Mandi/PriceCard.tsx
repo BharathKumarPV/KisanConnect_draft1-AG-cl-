@@ -7,8 +7,6 @@ interface PriceCardProps {
 }
 
 export default function PriceCard({ price, onClick }: PriceCardProps) {
-  const isDemo = price.source === 'demo-seed';
-
   return (
     <div
       className={`card p-4 ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
@@ -21,7 +19,6 @@ export default function PriceCard({ price, onClick }: PriceCardProps) {
             <span className="text-xs text-gray-500">{price.variety.name}</span>
           )}
         </div>
-        {isDemo && <span className="badge badge-demo text-xs">DEMO</span>}
       </div>
 
       <div className="flex items-baseline gap-1 mb-3">

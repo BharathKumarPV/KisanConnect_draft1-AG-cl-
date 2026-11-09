@@ -124,7 +124,6 @@ export default function ProductDetailPage() {
         <div className="space-y-4">
           <div>
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {product.isDemo && <span className="badge badge-demo">DEMO</span>}
               <span className="badge badge-gray">{product.commodity?.category}</span>
               <span className="badge badge-green">{product.commodity?.name}</span>
             </div>

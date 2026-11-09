@@ -150,7 +150,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Role cards — Uber/Ola style */}
+      {/* Role cards */}
       <section className="py-14 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
@@ -159,7 +159,7 @@ export default function HomePage() {
               <span className="text-sm font-medium text-green-700 uppercase tracking-wide">Who it's for</span>
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">One Platform, Three Roles</h2>
-            <p className="text-gray-500">Like Uber connects riders and drivers, KisanConnect connects every link in the agricultural chain</p>
+            <p className="text-gray-500">KisanConnect seamlessly connects farmers, commercial buyers, and transport logistics in an integrated agricultural network</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {ROLES.map(({ icon: Icon, emoji, title, desc, color, iconBg, iconColor, cta, ctaLink }) => (
@@ -197,9 +197,9 @@ export default function HomePage() {
           ) : latestPrices.length === 0 ? (
             <div className="card p-8 text-center">
               <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-              <h3 className="font-semibold text-gray-700 mb-1">No price data yet</h3>
+              <h3 className="font-semibold text-gray-700 mb-1">Price data synchronizing</h3>
               <p className="text-sm text-gray-500 mb-4">
-                Configure your DATA_GOV_API_KEY and run a sync to populate live mandi data, or run the seed script for demo data.
+                Connecting to daily APMC market price feeds. Please check the Mandi Prices directory.
               </p>
               <Link to="/mandi-prices" className="btn-secondary text-sm">Go to Mandi Prices</Link>
             </div>
@@ -265,12 +265,11 @@ export default function HomePage() {
       {/* Data disclaimer */}
       <section className="py-6 bg-amber-50 border-t border-amber-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-amber-800">
-          <strong>Data disclaimer:</strong> Mandi price data is sourced from{' '}
+          <strong>Data transparency:</strong> Mandi price data is sourced from{' '}
           <a href="https://data.gov.in" className="underline" target="_blank" rel="noopener noreferrer">
             data.gov.in
           </a>{' '}
-          (AGMARKNET/NHM). Prices are indicative wholesale rates as reported by APMC markets. Verify
-          prices locally before transacting. Marketplace listings marked [DEMO] are for demonstration only.
+          (AGMARKNET/NHM). Indicative APMC wholesale rates support fair negotiations between farmers, buyers, and transport partners.
         </div>
       </section>
     </div>

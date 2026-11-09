@@ -172,7 +172,7 @@ export default function TransportDashboardPage() {
             <Truck className="w-6 h-6 text-blue-600" />
             Transport Dashboard
           </h1>
-          <p className="text-sm text-gray-500">Welcome, {user?.name.replace(' [DEMO]', '')} 🚛</p>
+          <p className="text-sm text-gray-500">Welcome, {user?.name} 🚛</p>
         </div>
         <button
           onClick={handleToggleAvailability}
