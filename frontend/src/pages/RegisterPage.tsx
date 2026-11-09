@@ -87,9 +87,19 @@ export default function RegisterPage() {
       if (role === 'FARMER') navigate('/farmer-dashboard');
       else if (role === 'BUYER') navigate('/buyer-dashboard');
       else navigate('/transport-dashboard');
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Registration failed.';
-      setError(msg);
+    } catch (err: any) {
+      let msg = err.response?.data?.error;
+      if (err.response?.data?.details?.fieldErrors) {
+        const fields = err.response.data.details.fieldErrors;
+        const firstField = Object.keys(fields)[0];
+        if (firstField && fields[firstField]?.[0]) {
+          msg = `${firstField}: ${fields[firstField][0]}`;
+        }
+      }
+      if (!msg && err.message) {
+        msg = err.message;
+      }
+      setError(msg || 'Registration failed. Please check your details and try again.');
     } finally {
       setIsLoading(false);
     }

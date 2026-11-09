@@ -243,6 +243,70 @@ async function main() {
     console.log(`    Order placed: ${createdOrderId}, Total: Rs ${res.data.order.totalAmount}`);
   });
 
+  await runTest('Inventory', 'Verify Stock Decremented Across Listings (500 kg -> 400 kg)', async () => {
+    // 1. Check Product Detail
+    const detailRes = await axios.get(`${API_BASE}/marketplace/products/${createdProductId}`);
+    if (detailRes.data.product.quantity !== 400) {
+      throw new Error(`Expected quantity 400 kg, got ${detailRes.data.product.quantity}`);
+    }
+
+    // 2. Check Marketplace List
+    const listRes = await axios.get(`${API_BASE}/marketplace/products`);
+    const found = listRes.data.data.find((p: any) => p.id === createdProductId);
+    if (!found || found.quantity !== 400) {
+      throw new Error(`Marketplace list failed to reflect updated quantity 400: ${found?.quantity}`);
+    }
+  });
+
+  await runTest('Inventory', 'Reject Order Exceeding Available Stock (Stock Enforcement)', async () => {
+    try {
+      await axios.post(`${API_BASE}/orders`, {
+        items: [{ productId: createdProductId, quantity: 450, unit: 'kg' }], // Available is only 400
+        deliveryAddress: 'Navi Mumbai APMC Retail Hub',
+      }, {
+        headers: { Authorization: `Bearer ${buyerToken}` }
+      });
+      throw new Error('Should have rejected order exceeding stock');
+    } catch (err: any) {
+      if (err.response?.status !== 400) throw err;
+      if (!err.response?.data?.error?.includes('exceeds available stock')) {
+        throw new Error(`Unexpected error message: ${err.response?.data?.error}`);
+      }
+    }
+  });
+
+  await runTest('Inventory', 'Verify Stock Decrement on Quintal Commodities (e.g. 200 Quintal -> 190 Quintal)', async () => {
+    // Find Red Onion or first quintal product
+    const listRes = await axios.get(`${API_BASE}/marketplace/products`);
+    const quintalProd = listRes.data.data.find((p: any) => p.unit === 'Quintal' && p.quantity >= 20);
+    if (quintalProd) {
+      const initialQty = quintalProd.quantity;
+      const orderQty = 10;
+      const orderRes = await axios.post(`${API_BASE}/orders`, {
+        items: [{ productId: quintalProd.id, quantity: orderQty, unit: quintalProd.unit }],
+        deliveryAddress: 'Bangalore Wholesale Yard',
+      }, {
+        headers: { Authorization: `Bearer ${buyerToken}` }
+      });
+      if (!orderRes.data.order?.id) throw new Error('Order creation failed for quintal product');
+
+      // Verify product detail now reflects initialQty - 10
+      const updatedProdRes = await axios.get(`${API_BASE}/marketplace/products/${quintalProd.id}`);
+      const expectedQty = initialQty - orderQty;
+      if (updatedProdRes.data.product.quantity !== expectedQty) {
+        throw new Error(`Expected ${expectedQty} Quintal, got ${updatedProdRes.data.product.quantity}`);
+      }
+
+      // Verify marketplace list also reflects initialQty - 10
+      const updatedListRes = await axios.get(`${API_BASE}/marketplace/products`);
+      const updatedFound = updatedListRes.data.data.find((p: any) => p.id === quintalProd.id);
+      if (updatedFound.quantity !== expectedQty) {
+        throw new Error(`Marketplace list expected ${expectedQty}, got ${updatedFound.quantity}`);
+      }
+      console.log(`    Quintal commodity ${quintalProd.title}: stock decremented from ${initialQty} to ${expectedQty} Quintal`);
+    }
+  });
+
   await runTest('Orders', 'Farmer Accepts Order (Triggers Delivery Job Creation)', async () => {
     const res = await axios.patch(`${API_BASE}/orders/${createdOrderId}/status`, {
       status: 'ACCEPTED'

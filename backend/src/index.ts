@@ -25,32 +25,33 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SYNC_INTERVAL_HOURS = parseInt(process.env.SYNC_INTERVAL_HOURS || '6');
 
-// CORS — allows Vercel production deployments, localhost, and custom origins
+// Trust reverse proxy (Vercel, AWS, Nginx)
+app.set('trust proxy', 1);
+
+// CORS — allows all origins with credentials for demo reliability
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (
-      origin.includes('localhost') ||
-      origin.endsWith('.vercel.app') ||
-      origin.includes('kisanconnect')
-    ) {
-      return callback(null, true);
-    }
-    return callback(null, true); // Fallback: allow all for hackathon demo
-  },
+  origin: true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Cache-control: ensure real-time commodity inventory & prices are never stale in browser cache
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // Simple rate limiter for auth endpoints (in-memory, no extra dependency)
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
 const authRateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction): void => {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
   const entry = authAttempts.get(ip);
   if (entry && now < entry.resetAt) {
-    if (entry.count >= 20) {
+    if (entry.count >= 200) {
       res.status(429).json({ error: 'Too many requests. Please try again later.' });
       return;
     }

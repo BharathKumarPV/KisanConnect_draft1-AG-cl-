@@ -139,6 +139,17 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
     return;
   }
 
+  // Validate stock availability for all commodities
+  for (const item of items) {
+    const product = products.find(p => p.id === item.productId)!;
+    if (item.quantity > product.quantity) {
+      res.status(400).json({
+        error: `Requested quantity (${item.quantity} ${product.unit}) exceeds available stock (${product.quantity} ${product.unit}) for "${product.title}"`
+      });
+      return;
+    }
+  }
+
   const farmerIds = [...new Set(products.map(p => p.farmerId))];
   if (farmerIds.length > 1) {
     res.status(400).json({ error: 'All items must be from the same farmer' });
@@ -183,6 +194,18 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response): Promise<
       farmer: { select: { id: true, name: true } },
     },
   });
+
+  // Automatically decrement product stock for all ordered commodities
+  for (const item of items) {
+    const product = products.find(p => p.id === item.productId)!;
+    const newQty = Math.max(0, product.quantity - item.quantity);
+    await prisma.product.update({
+      where: { id: item.productId },
+      data: {
+        quantity: newQty,
+      },
+    });
+  }
 
   // Notify farmer
   await prisma.notification.create({
@@ -244,6 +267,19 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
     where: { id: req.params.id },
     data: { status },
   });
+
+  // If order was cancelled, restore the stock to the farmer's listing
+  if (status === 'CANCELLED' && order.status !== 'CANCELLED') {
+    const orderItems = await prisma.orderItem.findMany({ where: { orderId: order.id } });
+    for (const itm of orderItems) {
+      await prisma.product.update({
+        where: { id: itm.productId },
+        data: {
+          quantity: { increment: itm.quantity },
+        },
+      }).catch(() => {});
+    }
+  }
 
   // If farmer accepts and there's a delivery address, create a pending delivery
   if (status === 'ACCEPTED' && order.deliveryAddress) {

@@ -26,10 +26,45 @@ export const authenticate = async (
   try {
     const decoded = verifyToken(token);
 
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, email: true, role: true, name: true, isActive: true },
     });
+
+    if (!user) {
+      try {
+        user = await prisma.user.create({
+          data: {
+            id: decoded.id,
+            email: decoded.email,
+            name: decoded.name || 'User',
+            role: decoded.role || 'BUYER',
+            passwordHash: '$2a$12$dummyHashForJwtVerifiedUser',
+            isActive: true,
+          },
+          select: { id: true, email: true, role: true, name: true, isActive: true },
+        });
+
+        if (decoded.role === 'BUYER') {
+          await prisma.buyerProfile.create({
+            data: { userId: decoded.id, district: 'National', state: 'India', buyerType: 'RETAIL' },
+          }).catch(() => {});
+        } else if (decoded.role === 'FARMER') {
+          await prisma.farmerProfile.create({
+            data: { userId: decoded.id, district: 'National', state: 'India' },
+          }).catch(() => {});
+        } else if (decoded.role === 'TRANSPORT') {
+          await prisma.transportProfile.create({
+            data: { userId: decoded.id, licenseNumber: 'VERIFIED', district: 'National', state: 'India' },
+          }).catch(() => {});
+        }
+      } catch {
+        user = await prisma.user.findUnique({
+          where: { id: decoded.id },
+          select: { id: true, email: true, role: true, name: true, isActive: true },
+        });
+      }
+    }
 
     if (!user || !user.isActive) {
       res.status(401).json({ error: 'Invalid or inactive user' });

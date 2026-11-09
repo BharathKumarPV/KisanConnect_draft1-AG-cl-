@@ -19,6 +19,7 @@ export default function ProductDetailPage() {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [qty, setQty] = useState(1);
+  const [orderedQty, setOrderedQty] = useState(0);
 
   // Delivery location state
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -63,6 +64,11 @@ export default function ProductDetailPage() {
         deliveryLat,
         deliveryLng,
       });
+      const purchased = qty;
+      const newStock = Math.max(0, product.quantity - purchased);
+      setOrderedQty(purchased);
+      setProduct((prev) => (prev ? { ...prev, quantity: newStock } : null));
+      setQty(Math.min(1, newStock));
       setOrderSuccess(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to place order.';
@@ -203,18 +209,56 @@ export default function ProductDetailPage() {
                 deliveryLng={deliveryLng}
               />
 
-              {orderError && <p className="text-red-500 text-xs">{orderError}</p>}
-              <button onClick={handleOrder} disabled={orderLoading} className="btn-primary w-full">
+              {orderError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg p-3">
+                  <p className="font-semibold mb-0.5">{orderError}</p>
+                  {(orderError.toLowerCase().includes('token') || orderError.toLowerCase().includes('auth')) && (
+                    <p className="mt-1">
+                      Your session may have expired.{' '}
+                      <Link to="/login" className="underline font-bold text-red-800">
+                        Please click here to sign in again.
+                      </Link>
+                    </p>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={handleOrder}
+                disabled={orderLoading || product.quantity <= 0}
+                className="btn-primary w-full disabled:opacity-50"
+              >
                 <ShoppingCart className="w-4 h-4" />
-                {orderLoading ? 'Placing Order...' : 'Place Order'}
+                {orderLoading
+                  ? 'Placing Order...'
+                  : product.quantity <= 0
+                  ? 'Out of Stock'
+                  : 'Place Order'}
               </button>
               <p className="text-xs text-gray-400 text-center">Order goes to farmer for review. Delivery assigned on acceptance.</p>
             </div>
           )}
 
           {orderSuccess && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-700">
-              ✓ Order placed successfully. Check your dashboard for status updates and delivery tracking.
+            <div className="bg-green-50 border border-green-200 rounded-lg p-5 text-sm text-green-800 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">✅</span>
+                <span className="font-bold text-base">Order Placed Successfully!</span>
+              </div>
+              <p className="text-sm text-green-700 leading-relaxed">
+                You ordered <strong>{orderedQty} {product.unit}</strong> of {product.title}.
+              </p>
+              <div className="bg-white/80 border border-green-200 rounded-lg p-3 text-xs text-gray-700">
+                <span>Updated Available Stock: </span>
+                <strong className="text-green-800 text-sm">{product.quantity.toLocaleString('en-IN')} {product.unit}</strong>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Link to="/buyer-dashboard" className="btn-primary text-xs py-2 px-3">
+                  Track in My Orders
+                </Link>
+                <Link to="/marketplace" className="btn-secondary text-xs py-2 px-3">
+                  Back to Marketplace
+                </Link>
+              </div>
             </div>
           )}
 
@@ -227,6 +271,12 @@ export default function ProductDetailPage() {
           {isAuthenticated && user?.role === 'FARMER' && isOwnProduct && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
               This is your listing. You cannot order your own produce.
+            </div>
+          )}
+
+          {isAuthenticated && user?.role !== 'BUYER' && !isOwnProduct && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+              You are signed in as a {user?.role.toLowerCase()}. To purchase produce, please sign in with a Buyer account.
             </div>
           )}
         </div>

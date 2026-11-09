@@ -47,10 +47,14 @@ export default function ProductCard({ product, onFavorite }: ProductCardProps) {
 
       {/* Details */}
       <div className="flex items-center justify-between text-xs text-gray-600 mb-3">
-        <div className="flex items-center gap-1">
-          <Package className="w-3.5 h-3.5" />
-          {product.quantity.toLocaleString('en-IN')} {product.unit} available
-        </div>
+        {product.quantity > 0 ? (
+          <div className="flex items-center gap-1">
+            <Package className="w-3.5 h-3.5 text-green-700" />
+            <span className="font-semibold text-gray-800">{product.quantity.toLocaleString('en-IN')} {product.unit}</span> available
+          </div>
+        ) : (
+          <span className="badge badge-red text-xs font-semibold">Out of Stock</span>
+        )}
       </div>
 
       {/* Location */}
